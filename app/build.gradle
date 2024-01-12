@@ -1,0 +1,66 @@
+plugins {
+    id 'application'
+    // https://graalvm.github.io/native-build-tools/latest/gradle-plugin.html
+    id 'org.graalvm.buildtools.native' version '0.9.28'
+}
+
+repositories {
+    mavenCentral()
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+application {
+    mainClass = 'com.example.App'
+}
+
+tasks.withType(JavaExec) {
+    // Arguments to the JVM during 'run' task
+    jvmArgs += ["-Djava.library.path=${rootDir}"]
+}
+
+run {
+    outputs.upToDateWhen { false }
+}
+
+graalvmNative {
+    binaries {
+        main {
+            // Select the specific toolchain
+            javaLauncher = javaToolchains.launcherFor {
+                languageVersion = JavaLanguageVersion.of(21)
+                vendor = JvmVendorSpec.matching("Oracle Corporation")
+            }
+            // The name of the native image, defaults to the project name
+            imageName = 'app'
+            // Add verbose output, defaults to false
+            verbose = true
+            // Use the quick build mode ('-Ob') to speed up builds during development
+            quickBuild = true
+            // Arguments to the built image during 'nativeRun' task
+            runtimeArgs.add("-Djava.library.path=${rootDir}")
+        }
+    }
+}
+
+distributions {
+    nativeApp {
+        distributionBaseName = 'nativeApp'
+        contents {
+            // Native application
+            from("${buildDir}/native/nativeCompile")
+            // Shared library
+            from("${rootDir}") {
+                include 'libhello.so'
+            }
+        }
+    }
+}
+
+tasks.named('installNativeAppDist') {
+    dependsOn tasks.named('nativeCompile')
+}
